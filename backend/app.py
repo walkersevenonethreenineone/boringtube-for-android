@@ -99,6 +99,17 @@ def extract_stream(youtube_url: str) -> dict:
         "no_warnings": True,
         "noplaylist": True,
         "skip_download": True,
+
+        # Используем YouTube embedded client.
+        # Сейчас он не требует GVS PO Token.
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["web_embedded"]
+            }
+        },
+
+        # Нам нужен один уже готовый поток:
+        # видео + звук вместе.
         "format": (
             "best[ext=mp4][vcodec!=none][acodec!=none]"
             "/best[vcodec!=none][acodec!=none]"
@@ -112,11 +123,17 @@ def extract_stream(youtube_url: str) -> dict:
         raise RuntimeError("yt-dlp returned no video information")
 
     stream_url = info.get("url")
+
     if not stream_url:
         raise RuntimeError("No direct media URL was returned")
 
     headers = dict(info.get("http_headers") or {})
-    fmt = info.get("format_note") or info.get("format") or info.get("format_id")
+
+    fmt = (
+        info.get("format_note")
+        or info.get("format")
+        or info.get("format_id")
+    )
 
     return {
         "stream_url": stream_url,
