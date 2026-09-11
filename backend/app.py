@@ -96,20 +96,22 @@ def resolve_video():
 def extract_stream(youtube_url: str) -> dict:
     ydl_opts = {
         "quiet": True,
-        "no_warnings": True,
+        "no_warnings": False,
         "noplaylist": True,
         "skip_download": True,
 
-        # Используем YouTube embedded client.
-        # Сейчас он не требует GVS PO Token.
+        # Актуальная рекомендуемая схема:
+        # mweb + автоматический PO Token Provider.
         "extractor_args": {
             "youtube": {
-                "player_client": ["web_embedded"]
+                "player_client": ["mweb"]
+            },
+            "youtubepot-bgutilscript": {
+                "server_home": ["/opt/bgutil/server"]
             }
         },
 
-        # Нам нужен один уже готовый поток:
-        # видео + звук вместе.
+        # Один уже объединённый video+audio поток.
         "format": (
             "best[ext=mp4][vcodec!=none][acodec!=none]"
             "/best[vcodec!=none][acodec!=none]"
