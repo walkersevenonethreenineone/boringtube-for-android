@@ -3,22 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-
   <meta name="theme-color" content="#111111">
   <meta name="mobile-web-app-capable" content="yes">
-
   <title>BoringTube</title>
 
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="icon-192.png">
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
-    html,
-    body {
+    html, body {
       margin: 0;
       width: 100%;
       min-height: 100%;
@@ -62,13 +56,8 @@
       outline: none;
     }
 
-    input:focus {
-      border-color: #777;
-    }
-
-    button {
-      font: inherit;
-    }
+    input:focus { border-color: #777; }
+    button { font: inherit; }
 
     #watchButton {
       width: 100%;
@@ -82,10 +71,10 @@
       cursor: pointer;
     }
 
-    #error {
+    #status {
       min-height: 24px;
-      padding-top: 9px;
-      color: #aaa;
+      padding-top: 10px;
+      color: #999;
       font-size: 14px;
     }
 
@@ -96,11 +85,12 @@
       background: #000;
     }
 
-    iframe {
+    video {
       width: 100%;
       height: 100%;
-      border: 0;
       display: block;
+      background: #000;
+      object-fit: contain;
     }
 
     #back {
@@ -108,39 +98,27 @@
       top: max(10px, env(safe-area-inset-top));
       left: max(10px, env(safe-area-inset-left));
       z-index: 5;
-
       width: 44px;
       height: 44px;
-
       border: 0;
       border-radius: 10px;
-
-      background: rgba(0, 0, 0, 0.55);
+      background: rgba(0,0,0,.55);
       color: #ddd;
-
       font-size: 24px;
       line-height: 1;
-
       cursor: pointer;
-      opacity: 0.35;
+      opacity: .28;
     }
 
     #back:active,
-    #back:focus {
-      opacity: 1;
-    }
+    #back:focus { opacity: 1; }
   </style>
 </head>
 
 <body>
-
   <main id="home">
-
     <h1>BoringTube</h1>
-
-    <p>
-      Вставь ссылку на то, что уже решил посмотреть.
-    </p>
+    <p>Вставь ссылку на то, что уже решил посмотреть.</p>
 
     <input
       id="url"
@@ -152,228 +130,123 @@
       placeholder="https://youtu.be/..."
     >
 
-    <button id="watchButton" type="button">
-      Смотреть
-    </button>
-
-    <div id="error"></div>
-
+    <button id="watchButton" type="button">Смотреть</button>
+    <div id="status"></div>
   </main>
 
-
   <section id="watch">
+    <button id="back" type="button" aria-label="Закрыть видео">←</button>
 
-    <button
-      id="back"
-      type="button"
-      aria-label="Закрыть видео"
-    >
-      ←
-    </button>
-
-    <iframe
+    <video
       id="player"
-      title="YouTube video player"
-      referrerpolicy="strict-origin-when-cross-origin"
-      allow="
-        accelerometer;
-        autoplay;
-        clipboard-write;
-        encrypted-media;
-        gyroscope;
-        picture-in-picture;
-        web-share
-      "
-      allowfullscreen>
-    </iframe>
-
+      controls
+      playsinline
+      preload="metadata"
+      controlslist="nodownload">
+    </video>
   </section>
 
-
   <script>
+    /*
+      После размещения backend замени адрес ниже, например:
+      const BACKEND = "https://boringtube-backend.onrender.com";
+    */
+    const BACKEND = "https://PASTE-YOUR-BACKEND-HERE";
 
-    const input =
-      document.getElementById("url");
+    const input = document.getElementById("url");
+    const status = document.getElementById("status");
+    const home = document.getElementById("home");
+    const watch = document.getElementById("watch");
+    const player = document.getElementById("player");
+    const back = document.getElementById("back");
+    const watchButton = document.getElementById("watchButton");
 
-    const error =
-      document.getElementById("error");
+    function setBusy(busy) {
+      watchButton.disabled = busy;
+      input.disabled = busy;
+      watchButton.textContent = busy ? "Открываю..." : "Смотреть";
+    }
 
-    const home =
-      document.getElementById("home");
+    async function play() {
+      const url = input.value.trim();
 
-    const watch =
-      document.getElementById("watch");
-
-    const player =
-      document.getElementById("player");
-
-    const back =
-      document.getElementById("back");
-
-    const watchButton =
-      document.getElementById("watchButton");
-
-
-    function getVideoId(raw) {
-
-      const value = raw.trim();
-
-      if (/^[A-Za-z0-9_-]{11}$/.test(value)) {
-        return value;
+      if (!url) {
+        status.textContent = "Вставь ссылку YouTube.";
+        return;
       }
+
+      setBusy(true);
+      status.textContent = "Получаю чистый видеопоток...";
 
       try {
+        const response = await fetch(BACKEND + "/api/resolve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url })
+        });
 
-        const u = new URL(value);
+        const data = await response.json();
 
-        const host =
-          u.hostname.replace(/^www\./, "");
-
-
-        if (host === "youtu.be") {
-
-          return (
-            u.pathname
-              .split("/")
-              .filter(Boolean)[0]
-            || null
-          );
-
+        if (!response.ok) {
+          throw new Error(data.error || "Не удалось открыть видео.");
         }
 
+        player.src = BACKEND + data.stream;
 
-        if (
-          host === "youtube.com" ||
-          host === "m.youtube.com" ||
-          host === "music.youtube.com" ||
-          host === "youtube-nocookie.com"
-        ) {
+        home.style.display = "none";
+        watch.style.display = "block";
+        document.body.style.display = "block";
+        status.textContent = "";
 
-          if (u.pathname === "/watch") {
-            return u.searchParams.get("v");
-          }
-
-
-          const parts =
-            u.pathname
-              .split("/")
-              .filter(Boolean);
-
-
-          if (
-            ["shorts", "embed", "live"]
-              .includes(parts[0])
-          ) {
-
-            return parts[1] || null;
-
-          }
-
+        try {
+          await player.play();
+        } catch (_) {
+          // Некоторые мобильные браузеры всё равно требуют нажать Play вручную.
         }
 
-      } catch (_) {}
-
-
-      return null;
-
-    }
-
-
-    function play() {
-
-      const id =
-        getVideoId(input.value);
-
-
-      if (!id) {
-
-        error.textContent =
-          "Не удалось распознать ссылку YouTube.";
-
-        return;
-
+      } catch (error) {
+        status.textContent = error.message || "Ошибка.";
+      } finally {
+        setBusy(false);
       }
-
-
-      error.textContent = "";
-
-
-      player.src =
-        "https://www.youtube-nocookie.com/embed/"
-        + encodeURIComponent(id)
-        + "?autoplay=1&playsinline=1&rel=0";
-
-
-      home.style.display = "none";
-
-      watch.style.display = "block";
-
-      document.body.style.display = "block";
-
     }
-
 
     function closeVideo() {
-
-      player.src = "";
+      player.pause();
+      player.removeAttribute("src");
+      player.load();
 
       watch.style.display = "none";
-
       home.style.display = "block";
-
       document.body.style.display = "grid";
 
       input.value = "";
-
+      status.textContent = "";
       input.focus();
-
     }
 
+    watchButton.addEventListener("click", play);
 
-    watchButton.addEventListener(
-      "click",
-      play
-    );
-
-
-    input.addEventListener(
-      "keydown",
-      event => {
-
-        if (event.key === "Enter") {
-
-          event.preventDefault();
-
-          play();
-
-        }
-
+    input.addEventListener("keydown", event => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        play();
       }
-    );
+    });
 
+    back.addEventListener("click", closeVideo);
 
-    back.addEventListener(
-      "click",
-      closeVideo
-    );
-
+    player.addEventListener("error", () => {
+      if (player.error) {
+        alert("Поток не воспроизводится. Вернись назад и открой видео ещё раз.");
+      }
+    });
 
     if ("serviceWorker" in navigator) {
-
-      window.addEventListener(
-        "load",
-        () => {
-
-          navigator.serviceWorker
-            .register("./sw.js")
-            .catch(() => {});
-
-        }
-      );
-
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      });
     }
-
   </script>
-
 </body>
 </html>
